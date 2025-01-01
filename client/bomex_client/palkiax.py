@@ -83,13 +83,13 @@ class Palkiax:
         missing_range = required_range.difference(self.exog.index)
 
         if not missing_range.empty:
-            if not a.empty and len(exog) >= len(missing_range):  # not none
-                self.exog = self.exog.append(exog.loc[missing_range]).sort_index()
+            if not exog.empty and len(exog) >= len(missing_range):  # not none
+                self.exog = pd.concat([self.exog, exog])
             else:
                 raise ValueError("Insufficient exog values provided")
 
         forecast = self.results.get_forecast(
-            steps=steps, exog=self.exog[required_range]
+            steps=steps, exog=self.exog.loc[required_range]
         )
         confidence_interval = (
             forecast.conf_int(alpha=risk_appetite).iloc[steps - 1].to_dict()
