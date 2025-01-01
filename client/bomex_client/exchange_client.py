@@ -6,13 +6,20 @@ import time
 from threading import Thread
 from sys import argv
 import datetime
-
+from typing import Dict
 
 from dataclasses import dataclass, asdict
 
+"""
+Uses 
+
+"""
+
+
 class Direction:
-    BUY = 'BUY'
-    SELL = 'SELL'
+    BUY = "BUY"
+    SELL = "SELL"
+
 
 @dataclass
 class Order:
@@ -22,18 +29,27 @@ class Order:
     size: int
     sender: Optional[str]
     timestamp: Optional[int]
-    
-    def __init__(self, direction: str, price: float, size: int, id: Optional[str] = None, sender: Optional[str] = None, timestamp: Optional[int] = None):
+
+    def __init__(
+        self,
+        direction: str,
+        price: float,
+        size: int,
+        id: Optional[str] = None,
+        sender: Optional[str] = None,
+        timestamp: Optional[int] = None,
+    ):
         self.id = id
         self.direction = direction
         self.price = price
         self.size = size
         self.sender = sender
         self.timestamp = timestamp
-    
+
+
 @dataclass
 class Trade:
-    id : str
+    id: str
     buyer: str
     buy_order_id: str
     sell_order_id: str
@@ -41,107 +57,111 @@ class Trade:
     price: float
     size: int
     timestamp: int
-  
-@dataclass  
+
+
+@dataclass
 class Instrument:
     name: str
     expiry: datetime.datetime
 
-class ExchangeClient():
+
+class ExchangeClient:
     current_instrument: Optional[Instrument]
-    
+
     def __init__(self, ws_url: str, id: str):
-        assert (ws_url is not None and id is not None)
+        assert ws_url is not None and id is not None
         super().__init__()
         self.ws_url = ws_url
         self.id = id
-        self.ws = websocket.WebSocketApp("ws://" + ws_url,
-                                         on_message=self.on_message,
-                                         on_error=self.on_error,
-                                         on_close=self.on_close)
+        self.ws = websocket.WebSocketApp(
+            "ws://" + ws_url,
+            on_message=self.on_message,
+            on_error=self.on_error,
+            on_close=self.on_close,
+        )
         self.ws.on_open = self.on_open
         self.thread = Thread(target=self.ws.run_forever, daemon=True)
         self.current_instrument = None
 
     def start(self):
         self.thread.start()
-        time.sleep(1) # Sleep for a sec to wait for thread to start
-        
+        time.sleep(1)  # Sleep for a sec to wait for thread to start
+
     def stop(self):
         self.ws.close()
-        
-    def _trade_handler(self, trade : dict):
-        if trade['buyer'] == self.id or trade['seller'] == self.id:
+
+    def _trade_handler(self, trade: dict):
+        if trade["buyer"] == self.id or trade["seller"] == self.id:
             trade_obj = Trade(**trade)
             self.on_trade(trade_obj)
 
-    def _order_confirmation_handler(self, orders : dict):
+    def _order_confirmation_handler(self, orders: dict):
         order_obj = Order(**orders)
         self.on_order_confirmation(order_obj)
-        
-    def _new_instrument_handler(self, instrument : dict):
-        expiry_date = datetime.datetime.utcfromtimestamp(instrument['expiry'])
-        self.current_instrument = Instrument(instrument['name'], expiry_date)
+
+    def _new_instrument_handler(self, instrument: dict):
+        expiry_date = datetime.datetime.utcfromtimestamp(instrument["expiry"])
+        self.current_instrument = Instrument(instrument["name"], expiry_date)
         self.on_new_instrument(self.current_instrument)
-        
-    def on_new_instrument(self, instrument : Instrument):
+
+    def on_new_instrument(self, instrument: Instrument):
         pass
-        
-    def on_trade(self, trade : Trade):
+
+    def on_trade(self, trade: Trade):
         pass
-    
-    def on_order_confirmation(self, order : Order):
+
+    def on_order_confirmation(self, order: Order):
         pass
-    
-    def on_orders(self, sell_orders : dict[Order], buy_orders : dict[Order]):
+
+    def on_orders(self, sell_orders: dict[Order], buy_orders: dict[Order]):
         pass
-    
-    def on_all_trades(self, trades : List[Trade]):
+
+    def on_all_trades(self, trades: List[Trade]):
         pass
-    
-    def on_pnls(self, pnls : dict):
+
+    def on_pnls(self, pnls: dict):
         pass
-    
-    def on_removed_order(self, order : Order):
+
+    def on_removed_order(self, order: Order):
         pass
-    
+
     def clear_orders(self):
         self.ws.send(json.dumps({"type": "clear_orders", "sender": self.id}))
-    
+
     def request_pnls(self):
         self.ws.send(json.dumps({"type": "get_pnls"}))
-    
+
     def request_all_trades(self):
         self.ws.send(json.dumps({"type": "get_trades"}))
-    
-    def send_order(self, order : Order):
+
+    def send_order(self, order: Order):
         order.sender = self.id
-        self.ws.send(json.dumps({'type': 'order', 'order': asdict(order)}))
-        
-    def remove_order(self, order : Order):
-        self.ws.send(json.dumps({'type': 'remove_order', 'order': asdict(order)}))
+        self.ws.send(json.dumps({"type": "order", "order": asdict(order)}))
+
+    def remove_order(self, order: Order):
+        self.ws.send(json.dumps({"type": "remove_order", "order": asdict(order)}))
 
     def on_message(self, ws, message):
         msg = json.loads(message)
-        if msg['type'] == 'new_instrument':
-            self._new_instrument_handler(msg['data'])
-        elif msg['type'] == 'instrument_closed':
+        if msg["type"] == "new_instrument":
+            self._new_instrument_handler(msg["data"])
+        elif msg["type"] == "instrument_closed":
             self.current_instrument = None
-            self.on_pnls(msg['data'])
-        elif msg['type'] == 'initial_state':
-            self._new_instrument_handler(msg['current_instrument'])
-        elif msg['type'] == 'trades':
-            for trade in msg['data']:
+            self.on_pnls(msg["data"])
+        elif msg["type"] == "initial_state":
+            self._new_instrument_handler(msg["current_instrument"])
+        elif msg["type"] == "trades":
+            for trade in msg["data"]:
                 self._trade_handler(trade)
-        elif msg['type'] == 'all_trades':
-            self.on_all_trades(list(map(lambda x: Trade(**x), msg['trades'])))
-        elif msg['type'] == 'pnls':
-            self.on_pnls(msg['pnls'])
-        elif msg['type'] == 'order_confirmation':
-            if msg['data']['sender'] == self.id:
-                self._order_confirmation_handler(msg['data'])
-        elif msg['type'] == 'removed_orders':
-            for order in msg['data']:
+        elif msg["type"] == "all_trades":
+            self.on_all_trades(list(map(lambda x: Trade(**x), msg["trades"])))
+        elif msg["type"] == "pnls":
+            self.on_pnls(msg["pnls"])
+        elif msg["type"] == "order_confirmation":
+            if msg["data"]["sender"] == self.id:
+                self._order_confirmation_handler(msg["data"])
+        elif msg["type"] == "removed_orders":
+            for order in msg["data"]:
                 self.on_removed_order(Order(**order))
 
     def on_error(self, ws, error):

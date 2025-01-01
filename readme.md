@@ -19,7 +19,6 @@ To run the example client, run:
 
 # Exchange Overview
 The exchange is a simulated trading platform running a market system for weather-based instruments. It periodically fetches weather data and uses it to settle markets. Profit and loss (P&L) are updated only when markets are settled.
-
 The exchange trades apparent temperature futures, which are contracts that pay out based on the apparent temperature at a specified time. 
 The apparent temperature is the temperature that it feels like outside, which is different from the actual temperature due to wind chill and heat index. 
 
